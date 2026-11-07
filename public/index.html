@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Unit Converter</title>
+    <style>
+      :root {
+        --bg: #f4f6f8;
+        --card: #ffffff;
+        --text: #1f2933;
+        --muted: #6b7785;
+        --border: #d9dfe5;
+        --accent: #2f6f5e;
+        --accent-hover: #255a4c;
+        --danger: #c0392b;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #14171a;
+          --card: #1e2327;
+          --text: #e8ecef;
+          --muted: #98a3ad;
+          --border: #333b42;
+          --accent: #4fa88f;
+          --accent-hover: #6cc2a9;
+          --danger: #e5675a;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 24px 16px;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      .card {
+        max-width: 460px;
+        margin: 0 auto 20px;
+        padding: 24px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+      }
+      h1 {
+        margin: 0 0 20px;
+        font-size: 1.5rem;
+      }
+      h2 {
+        margin: 0;
+        font-size: 1.1rem;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+      .row > * {
+        flex: 1;
+        min-width: 0;
+      }
+      .arrow {
+        flex: 0 0 auto;
+        align-self: center;
+        color: var(--muted);
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 10px 12px;
+        font-size: 1rem;
+        color: var(--text);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+      }
+      input:focus,
+      select:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 1px;
+      }
+      button {
+        padding: 10px 16px;
+        font-size: 1rem;
+        font-weight: 600;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      #go {
+        width: 100%;
+        color: #fff;
+        background: var(--accent);
+      }
+      #go:hover {
+        background: var(--accent-hover);
+      }
+      #result {
+        min-height: 1.6em;
+        margin-top: 16px;
+        font-size: 1.25rem;
+        font-weight: 700;
+      }
+      #result.error {
+        color: var(--danger);
+        font-size: 1rem;
+      }
+      .history-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      #clear {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        color: var(--danger);
+        background: transparent;
+        border: 1px solid var(--danger);
+      }
+      #clear:hover {
+        background: var(--danger);
+        color: #fff;
+      }
+      ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+      li {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      li:last-child {
+        border-bottom: none;
+      }
+      .empty {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Unit Converter</h1>
+
+      <div class="row">
+        <input id="value" type="number" step="any" placeholder="Value" />
+      </div>
+      <div class="row">
+        <select id="from"></select>
+        <span class="arrow">to</span>
+        <select id="to"></select>
+      </div>
+      <button id="go">Convert</button>
+
+      <div id="result"></div>
+    </div>
+
+    <div class="card">
+      <div class="history-head">
+        <h2>History</h2>
+        <button id="clear">Clear</button>
+      </div>
+      <ul id="history"></ul>
+    </div>
+
+    <script>
+      const units = ["m", "km", "mi", "ft", "yd"];
+      const valueInput = document.getElementById("value");
+      const fromSel = document.getElementById("from");
+      const toSel = document.getElementById("to");
+      const resultDiv = document.getElementById("result");
+      const historyList = document.getElementById("history");
+
+      units.forEach(u => {
+        fromSel.add(new Option(u, u));
+        toSel.add(new Option(u, u));
+      });
+      toSel.value = "mi";
+
+      async function convert() {
+        resultDiv.className = "";
+        if (valueInput.value === "") {
+          resultDiv.className = "error";
+          resultDiv.textContent = "Please enter a number.";
+          return;
+        }
+        const url = `/api/convert?from=${fromSel.value}&to=${toSel.value}&value=${encodeURIComponent(valueInput.value)}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!response.ok) {
+          resultDiv.className = "error";
+          resultDiv.textContent = data.error;
+          return;
+        }
+        resultDiv.textContent = `${data.value} ${data.from} = ${data.result} ${data.to}`;
+        loadHistory();
+      }
+
+      async function loadHistory() {
+        const response = await fetch("/api/history");
+        const rows = await response.json();
+        historyList.innerHTML = "";
+
+        if (rows.length === 0) {
+          const li = document.createElement("li");
+          li.className = "empty";
+          li.textContent = "No conversions yet.";
+          historyList.appendChild(li);
+          return;
+        }
+        rows.forEach(row => {
+          const li = document.createElement("li");
+          li.textContent = `${row.input_value} ${row.from_unit} = ${row.result} ${row.to_unit}`;
+          historyList.appendChild(li);
+        });
+      }
+
+      async function clearHistory() {
+        if (!confirm("Delete all history?")) return;
+        await fetch("/api/history", { method: "DELETE" });
+        loadHistory();
+      }
+
+      document.getElementById("go").addEventListener("click", convert);
+      document.getElementById("clear").addEventListener("click", clearHistory);
+      loadHistory();
+    </script>
+  </body>
+</html>
